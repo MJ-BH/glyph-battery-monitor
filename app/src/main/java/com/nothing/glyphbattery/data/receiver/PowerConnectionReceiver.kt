@@ -23,15 +23,26 @@ class PowerConnectionReceiver : BroadcastReceiver(), KoinComponent {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+        android.util.Log.i("PowerConnectionReceiver", "Received broadcast action: $action")
 
         when (action) {
             Intent.ACTION_POWER_CONNECTED -> {
+                val pending = goAsync()
                 CoroutineScope(Dispatchers.Default).launch {
-                    val batteryResult = batteryRepository.getBatteryInfo()
-                    val batteryLevel = batteryResult.getOrNull()?.level ?: 50
-                    val glyphState = glyphRepository.glyphState.value
-                    if (glyphState.flashOnPlugIn) {
-                        glyphRepository.triggerBatteryFlash(batteryLevel)
+                    try {
+                        glyphRepository.initialize()
+                        kotlinx.coroutines.delay(250)
+                        val batteryResult = batteryRepository.getBatteryInfo()
+                        val batteryLevel = batteryResult.getOrNull()?.level ?: 50
+                        val glyphState = glyphRepository.glyphState.value
+                        if (glyphState.flashOnPlugIn) {
+                            android.util.Log.i("PowerConnectionReceiver", "Flashing Glyph on cable plug-in: $batteryLevel%")
+                            glyphRepository.triggerBatteryFlash(batteryLevel)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("PowerConnectionReceiver", "Error flashing Glyph: ${e.message}")
+                    } finally {
+                        pending.finish()
                     }
                 }
             }

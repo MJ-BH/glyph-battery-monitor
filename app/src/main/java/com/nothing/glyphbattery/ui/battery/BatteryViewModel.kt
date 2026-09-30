@@ -55,6 +55,17 @@ class BatteryViewModel(
                 glyphRepository.displayProgress(currentLevel)
             }
         }
+
+        viewModelScope.launch {
+            var wasCharging: Boolean? = null
+            observeBatteryInfoUseCase().collect { info ->
+                if (wasCharging != null && wasCharging == false && info.isCharging) {
+                    // Transitioned from unplugged to plugged in
+                    flashBatteryOnGlyph()
+                }
+                wasCharging = info.isCharging
+            }
+        }
     }
 
     fun onEvent(event: BatteryUiEvent) {
