@@ -8,6 +8,7 @@ import android.util.Log
 import com.nothing.glyphbattery.data.dto.GlyphStateDto
 import com.nothing.glyphbattery.domain.model.NothingDeviceModel
 import com.nothing.ketchum.Common
+import com.nothing.ketchum.Glyph
 import com.nothing.ketchum.GlyphFrame
 import com.nothing.ketchum.GlyphManager
 import kotlinx.coroutines.CoroutineScope
@@ -80,8 +81,12 @@ class GlyphManagerBridge(
 
                     val deviceKey = detectDeviceKey()
                     try {
-                        glyphManager?.register(deviceKey)
-                        Log.i(tag, "Registered Glyph device with key: $deviceKey")
+                        val regSuccess = glyphManager?.register(deviceKey) ?: false
+                        Log.i(tag, "Registered Glyph device with key: $deviceKey, success=$regSuccess")
+                        if (!regSuccess) {
+                            val defaultReg = glyphManager?.register() ?: false
+                            Log.i(tag, "Fallback register() success=$defaultReg")
+                        }
                     } catch (e: Exception) {
                         Log.w(tag, "Register error: ${e.message}")
                     }
@@ -112,16 +117,16 @@ class GlyphManagerBridge(
 
     private fun detectDeviceKey(): String {
         return when {
-            Common.is23113() -> "23113"
-            Common.is23111() -> "23111"
-            Common.is22111() -> "22111"
-            Common.is20111() -> "20111"
-            Common.is24111() -> "24111"
-            Build.MODEL.contains("A142P", ignoreCase = true) -> "23113"
-            Build.MODEL.contains("A142", ignoreCase = true) -> "23111"
-            Build.MODEL.contains("A065", ignoreCase = true) -> "22111"
-            Build.MODEL.contains("A063", ignoreCase = true) -> "20111"
-            else -> "23111"
+            Common.is23113() -> Glyph.DEVICE_23113 // "A142P"
+            Common.is23111() -> Glyph.DEVICE_23111 // "A142"
+            Common.is22111() -> Glyph.DEVICE_22111 // "A065"
+            Common.is20111() -> Glyph.DEVICE_20111 // "A063"
+            Common.is24111() -> Glyph.DEVICE_24111 // "A059"
+            Build.MODEL.contains("A142P", ignoreCase = true) -> Glyph.DEVICE_23113
+            Build.MODEL.contains("A142", ignoreCase = true) -> Glyph.DEVICE_23111
+            Build.MODEL.contains("A065", ignoreCase = true) -> Glyph.DEVICE_22111
+            Build.MODEL.contains("A063", ignoreCase = true) -> Glyph.DEVICE_20111
+            else -> Glyph.DEVICE_23111
         }
     }
 
@@ -209,21 +214,22 @@ class GlyphManagerBridge(
             try {
                 val builder = gm.glyphFrameBuilder ?: return
 
-                when (_glyphDtoState.value.detectedModelCode) {
-                    NothingGlyphConstants.MODEL_CODE_PHONE_1 -> {
+                when {
+                    Common.is20111() -> {
                         builder.buildChannelD()
                     }
-                    NothingGlyphConstants.MODEL_CODE_PHONE_2 -> {
+                    Common.is22111() -> {
                         builder.buildChannelC()
                     }
                     else -> {
-                        // Phone (2a), Phone (2a)+, Phone (3a/4a)
-                        if (clamped > 0) builder.buildChannelA()
+                        // Phone (2a), Phone (2a)+, Phone (3a) - GDK 2.0 requires Channel C
+                        builder.buildChannelC()
                         if (clamped > 33) builder.buildChannelB()
-                        if (clamped > 66) builder.buildChannelC()
+                        if (clamped > 66) builder.buildChannelA()
                     }
                 }
                 val frame = builder.build()
+                Log.i(tag, "Calling gm.displayProgress with progress: $clamped")
                 gm.displayProgress(frame, clamped, reverse)
             } catch (e: Exception) {
                 Log.w(tag, "Error executing displayProgress on physical Glyph: ${e.message}")
@@ -236,9 +242,9 @@ class GlyphManagerBridge(
         return when (code) {
             NothingGlyphConstants.MODEL_CODE_PHONE_2A, NothingGlyphConstants.MODEL_CODE_PHONE_2A_PLUS, NothingGlyphConstants.MODEL_CODE_PHONE_3A -> {
                 val list = mutableListOf<String>()
-                if (progress > 5) list.add(NothingGlyphConstants.CHANNEL_A)
+                if (progress > 5) list.add(NothingGlyphConstants.CHANNEL_C)
                 if (progress > 35) list.add(NothingGlyphConstants.CHANNEL_B)
-                if (progress > 70) list.add(NothingGlyphConstants.CHANNEL_C)
+                if (progress > 70) list.add(NothingGlyphConstants.CHANNEL_A)
                 list
             }
             NothingGlyphConstants.MODEL_CODE_PHONE_2 -> {
@@ -274,6 +280,9 @@ class GlyphManagerBridge(
         if (gm != null && isSessionActive) {
             try {
                 val builder = gm.glyphFrameBuilder ?: return
+                builder.buildPeriod(1500)
+                builder.buildCycles(5)
+                builder.buildInterval(100)
                 when (code) {
                     NothingGlyphConstants.MODEL_CODE_PHONE_2A, NothingGlyphConstants.MODEL_CODE_PHONE_2A_PLUS -> {
                         builder.buildChannelA()
@@ -290,7 +299,9 @@ class GlyphManagerBridge(
                     }
                 }
                 gm.animate(builder.build())
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(tag, "animateBreathing error: ${e.message}")
+            }
         }
     }
 
@@ -314,19 +325,22 @@ class GlyphManagerBridge(
                         builder.buildChannelA()
                         builder.buildChannelB()
                         builder.buildChannelC()
-                        builder.buildChannelD()
-                        builder.buildChannelE()
+                        if (Common.is20111() || Common.is22111()) {
+                            builder.buildChannelD()
+                            builder.buildChannelE()
+                        }
                         val frame = builder.build()
-                        gm.animate(frame)
+                        Log.i(tag, "Toggling all channels on physical Glyph")
+                        gm.toggle(frame)
                     }
                 } catch (e: Exception) {
-                    Log.w(tag, "animate error: ${e.message}")
+                    Log.w(tag, "toggle strobe error: ${e.message}")
                 }
             } else if (!isRealNothingPhone) {
                 flashCameraTorchFallback()
             }
 
-            delay(200)
+            delay(350)
 
             // 2. Clear momentarily
             _glyphDtoState.update { it.copy(activeChannels = emptyList()) }
@@ -335,13 +349,13 @@ class GlyphManagerBridge(
                     gm.turnOff()
                 } catch (_: Exception) {}
             }
-            delay(100)
+            delay(150)
 
             // 3. Display Exact Battery Percentage on Physical Glyph LEDs
             displayProgress(batteryLevel)
 
-            // 4. Hold the battery level indicator on the physical backplate for 2.5 seconds
-            delay(2500)
+            // 4. Hold the battery level indicator on the physical backplate for 3 seconds
+            delay(3000)
 
             // 5. Clean up
             _glyphDtoState.update { it.copy(activeChannels = emptyList()) }
