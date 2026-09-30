@@ -26,6 +26,14 @@ class ControlGlyphUseCase(
         glyphRepository.setSyncWithCharging(enabled)
     }
 
+    suspend fun setFlipToGlyphCharging(enabled: Boolean) {
+        glyphRepository.setFlipToGlyphCharging(enabled)
+    }
+
+    suspend fun turnOff() {
+        glyphRepository.turnOff()
+    }
+
     suspend fun selectDeviceModel(model: NothingDeviceModel) {
         glyphRepository.setDeviceModel(model)
     }

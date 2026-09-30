@@ -66,6 +66,27 @@ class BatteryViewModel(
                 wasCharging = info.isCharging
             }
         }
+
+        viewModelScope.launch {
+            var previousFaceDown = false
+            combine(
+                observeBatteryInfoUseCase(),
+                glyphRepository.glyphState
+            ) { battery, glyph ->
+                Pair(battery, glyph)
+            }.collect { (battery, glyph) ->
+                if (glyph.flipToGlyphCharging && glyph.isFaceDown && battery.isCharging) {
+                    // Continuous progress update while turned face-down and charging
+                    glyphRepository.openSession()
+                    glyphRepository.displayProgress(battery.level)
+                    previousFaceDown = true
+                } else if (previousFaceDown && (!glyph.isFaceDown || !battery.isCharging)) {
+                    // Device picked up or unplugged
+                    glyphRepository.turnOff()
+                    previousFaceDown = false
+                }
+            }
+        }
     }
 
     fun onEvent(event: BatteryUiEvent) {
@@ -95,6 +116,14 @@ class BatteryViewModel(
                         glyphState = it.glyphState.copy(flashOnPlugIn = event.enabled),
                         feedbackMessage = if (event.enabled) "Flash on plug-in Enabled" else "Flash on plug-in Disabled"
                     )
+                }
+            }
+            is BatteryUiEvent.ToggleFlipToGlyph -> {
+                viewModelScope.launch {
+                    controlGlyphUseCase.setFlipToGlyphCharging(event.enabled)
+                    _internalUiModel.update {
+                        it.copy(feedbackMessage = if (event.enabled) "Flip-to-Glyph Charging Enabled" else "Flip-to-Glyph Charging Disabled")
+                    }
                 }
             }
             is BatteryUiEvent.SelectDeviceModel -> {

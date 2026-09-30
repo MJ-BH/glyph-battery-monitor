@@ -21,6 +21,7 @@ import kotlinx.coroutines.withContext
 
 class GlyphRepositoryImpl(
     private val bridge: GlyphManagerBridge,
+    private val flipOrientationSensor: com.nothing.glyphbattery.data.source.FlipOrientationSensor,
     private val mapper: GlyphMapper,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -35,6 +36,15 @@ class GlyphRepositoryImpl(
         )
 
     private var animationJob: Job? = null
+
+    init {
+        // Observe face-down orientation and pipe to bridge
+        scope.launch {
+            flipOrientationSensor.observeIsFaceDown().collect { isFaceDown ->
+                bridge.updateFaceDown(isFaceDown)
+            }
+        }
+    }
 
     override suspend fun initialize() = withContext(ioDispatcher) {
         bridge.init()
@@ -85,6 +95,19 @@ class GlyphRepositoryImpl(
 
     override suspend fun setSyncWithCharging(enabled: Boolean) = withContext(ioDispatcher) {
         bridge.setSyncCharging(enabled)
+    }
+
+    override suspend fun setFlipToGlyphCharging(enabled: Boolean) = withContext(ioDispatcher) {
+        bridge.setFlipToGlyphCharging(enabled)
+    }
+
+    override fun observeFaceDown(): kotlinx.coroutines.flow.Flow<Boolean> {
+        return flipOrientationSensor.observeIsFaceDown()
+    }
+
+    override suspend fun turnOff() = withContext(ioDispatcher) {
+        animationJob?.cancel()
+        bridge.turnOff()
     }
 
     override suspend fun setDeviceModel(model: NothingDeviceModel) = withContext(ioDispatcher) {

@@ -361,6 +361,55 @@ private fun GlyphControlPanel(
                     )
                 )
             }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Flip to Glyph (Face-Down)",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = NothingWhite
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (state.glyphState.isFaceDown) Color(0xFF1E3A1E) else Color(0xFF222222))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (state.glyphState.isFaceDown) "FACE DOWN" else "FACE UP",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (state.glyphState.isFaceDown) Color(0xFF4CAF50) else NothingWhiteMuted
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Turn phone down on desk while charging to always show progress",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        color = NothingWhiteMuted
+                    )
+                }
+                Switch(
+                    checked = state.glyphState.flipToGlyphCharging,
+                    onCheckedChange = { onEvent(BatteryUiEvent.ToggleFlipToGlyph(it)) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = NothingWhite,
+                        checkedTrackColor = NothingRed,
+                        uncheckedThumbColor = NothingWhiteMuted,
+                        uncheckedTrackColor = NothingBlack
+                    )
+                )
+            }
         }
     }
 }

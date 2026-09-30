@@ -26,6 +26,7 @@ val appModule = module {
     // Data Sources
     single { BatteryDataSource(androidContext()) }
     single { GlyphManagerBridge(androidContext()) }
+    single { com.nothing.glyphbattery.data.source.FlipOrientationSensor(androidContext()) }
 
     // Repositories
     single<BatteryRepository> {
@@ -38,6 +39,7 @@ val appModule = module {
     single<GlyphRepository> {
         GlyphRepositoryImpl(
             bridge = get(),
+            flipOrientationSensor = get(),
             mapper = get()
         )
     }

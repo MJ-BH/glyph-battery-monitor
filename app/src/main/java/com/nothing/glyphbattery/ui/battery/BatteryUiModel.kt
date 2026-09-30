@@ -17,6 +17,7 @@ sealed interface BatteryUiEvent {
     data class ChangeAnimationMode(val mode: GlyphAnimationMode) : BatteryUiEvent
     data class ToggleChargingGlow(val enabled: Boolean) : BatteryUiEvent
     data class ToggleFlashOnPlugIn(val enabled: Boolean) : BatteryUiEvent
+    data class ToggleFlipToGlyph(val enabled: Boolean) : BatteryUiEvent
     data class SelectDeviceModel(val model: NothingDeviceModel) : BatteryUiEvent
     data class SetCustomProgress(val progress: Int) : BatteryUiEvent
     data object ClearFeedbackMessage : BatteryUiEvent

@@ -22,6 +22,8 @@ class GlyphMapper {
             deviceModel = device,
             syncWithCharging = dto.syncWithCharging,
             flashOnPlugIn = dto.flashOnPlugIn,
+            flipToGlyphCharging = dto.flipToGlyphCharging,
+            isFaceDown = dto.isFaceDown,
             lastFlashedTimestamp = dto.lastFlashedTimestamp,
             isGenuineHardware = dto.isGenuineHardware,
             hardwareModelName = dto.hardwareModelName
@@ -38,6 +40,8 @@ class GlyphMapper {
             detectedModelCode = domain.deviceModel.modelCode,
             syncWithCharging = domain.syncWithCharging,
             flashOnPlugIn = domain.flashOnPlugIn,
+            flipToGlyphCharging = domain.flipToGlyphCharging,
+            isFaceDown = domain.isFaceDown,
             lastFlashedTimestamp = domain.lastFlashedTimestamp,
             isGenuineHardware = domain.isGenuineHardware,
             hardwareModelName = domain.hardwareModelName

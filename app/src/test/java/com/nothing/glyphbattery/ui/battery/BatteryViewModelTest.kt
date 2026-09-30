@@ -65,6 +65,11 @@ class BatteryViewModelTest {
         override suspend fun setSyncWithCharging(enabled: Boolean) {
             _state.value = _state.value.copy(syncWithCharging = enabled)
         }
+        override suspend fun setFlipToGlyphCharging(enabled: Boolean) {
+            _state.value = _state.value.copy(flipToGlyphCharging = enabled)
+        }
+        override fun observeFaceDown(): Flow<Boolean> = flowOf(false)
+        override suspend fun turnOff() {}
         override suspend fun setDeviceModel(model: NothingDeviceModel) {
             _state.value = _state.value.copy(deviceModel = model)
         }

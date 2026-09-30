@@ -12,6 +12,8 @@ data class GlyphStateDto(
     val detectedModelCode: String,
     val syncWithCharging: Boolean,
     val flashOnPlugIn: Boolean,
+    val flipToGlyphCharging: Boolean = true,
+    val isFaceDown: Boolean = false,
     val lastFlashedTimestamp: Long,
     val isGenuineHardware: Boolean = false,
     val hardwareModelName: String = ""

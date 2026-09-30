@@ -396,6 +396,14 @@ class GlyphManagerBridge(
         _glyphDtoState.update { it.copy(flashOnPlugIn = enabled) }
     }
 
+    fun setFlipToGlyphCharging(enabled: Boolean) {
+        _glyphDtoState.update { it.copy(flipToGlyphCharging = enabled) }
+    }
+
+    fun updateFaceDown(isFaceDown: Boolean) {
+        _glyphDtoState.update { it.copy(isFaceDown = isFaceDown) }
+    }
+
     fun turnOff() {
         _glyphDtoState.update { it.copy(activeChannels = emptyList()) }
         val gm = glyphManager

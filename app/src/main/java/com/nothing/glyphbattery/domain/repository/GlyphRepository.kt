@@ -50,6 +50,21 @@ interface GlyphRepository {
     suspend fun setSyncWithCharging(enabled: Boolean)
 
     /**
+     * Toggles whether Flip-to-Glyph (face-down) always shows charging progress.
+     */
+    suspend fun setFlipToGlyphCharging(enabled: Boolean)
+
+    /**
+     * Observes whether the device is currently turned face down on a table.
+     */
+    fun observeFaceDown(): kotlinx.coroutines.flow.Flow<Boolean>
+
+    /**
+     * Turns off all active Glyph LED channels.
+     */
+    suspend fun turnOff()
+
+    /**
      * Manually overrides or specifies the active device model (useful for simulation or testing).
      */
     suspend fun setDeviceModel(model: NothingDeviceModel)

@@ -36,6 +36,9 @@ class TriggerGlyphBatteryFlashUseCaseTest {
             flashedLevel = batteryLevel
         }
         override suspend fun setSyncWithCharging(enabled: Boolean) {}
+        override suspend fun setFlipToGlyphCharging(enabled: Boolean) {}
+        override fun observeFaceDown(): Flow<Boolean> = flowOf(false)
+        override suspend fun turnOff() {}
         override suspend fun setDeviceModel(model: NothingDeviceModel) {}
         override fun release() {}
     }

@@ -82,17 +82,31 @@ class GlyphBatteryForegroundService : Service(), KoinComponent {
     private fun startObservingBattery() {
         syncJob?.cancel()
         syncJob = serviceScope.launch {
-            batteryRepo.observeBatteryInfo().collectLatest { batteryInfo ->
-                val state = glyphRepo.glyphState.value
-                if (state.syncWithCharging && batteryInfo.isCharging) {
-                    glyphRepo.openSession()
-                    glyphRepo.setAnimationMode(GlyphAnimationMode.BREATHING_CHARGING)
-                } else if (!batteryInfo.isCharging) {
+            kotlinx.coroutines.flow.combine(
+                batteryRepo.observeBatteryInfo(),
+                glyphRepo.glyphState,
+                glyphRepo.observeFaceDown()
+            ) { batteryInfo, glyphState, isFaceDown ->
+                Triple(batteryInfo, glyphState, isFaceDown)
+            }.collectLatest { (batteryInfo, state, isFaceDown) ->
+                if (batteryInfo.isCharging) {
+                    if (state.flipToGlyphCharging && isFaceDown) {
+                        // Phone is turned face-down on table & charging -> Always show battery progress!
+                        glyphRepo.openSession()
+                        glyphRepo.displayProgress(batteryInfo.level)
+                    } else if (state.syncWithCharging) {
+                        glyphRepo.openSession()
+                        glyphRepo.setAnimationMode(GlyphAnimationMode.BREATHING_CHARGING)
+                    } else {
+                        glyphRepo.turnOff()
+                    }
+                } else {
                     glyphRepo.closeSession()
                 }
 
                 val statusText = if (batteryInfo.isCharging) {
-                    "Charging: ${batteryInfo.level}% (Glyph Sync Active)"
+                    if (isFaceDown) "Charging: ${batteryInfo.level}% (Face-Down Glyph Active)"
+                    else "Charging: ${batteryInfo.level}% (Glyph Sync Active)"
                 } else {
                     "Battery: ${batteryInfo.level}%"
                 }
