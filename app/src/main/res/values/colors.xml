@@ -1,0 +1,9 @@
+<resources>
+    <color name="nothing_black">#000000</color>
+    <color name="nothing_dark_surface">#121212</color>
+    <color name="nothing_card_surface">#1E1E1E</color>
+    <color name="nothing_card_border">#2C2C2C</color>
+    <color name="nothing_white">#F7F7F7</color>
+    <color name="nothing_white_muted">#A0A0A0</color>
+    <color name="nothing_red">#D71921</color>
+</resources>

@@ -1,0 +1,25 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="shortcut_flash_battery"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_flash"
+        android:shortcutShortLabel="@string/shortcut_flash_short"
+        android:shortcutLongLabel="@string/shortcut_flash_long">
+        <intent
+            android:action="com.nothing.glyphbattery.ACTION_FLASH_BATTERY"
+            android:targetPackage="com.nothing.glyphbattery"
+            android:targetClass="com.nothing.glyphbattery.presentation.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_toggle_glow"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_charging"
+        android:shortcutShortLabel="@string/shortcut_glow_short"
+        android:shortcutLongLabel="@string/shortcut_glow_long">
+        <intent
+            android:action="com.nothing.glyphbattery.ACTION_TOGGLE_CHARGING_GLOW"
+            android:targetPackage="com.nothing.glyphbattery"
+            android:targetClass="com.nothing.glyphbattery.presentation.MainActivity" />
+    </shortcut>
+</shortcuts>

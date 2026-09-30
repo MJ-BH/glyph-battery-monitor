@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Glyph Battery</string>
+    <string name="widget_name">Nothing Battery Meter</string>
+    <string name="shortcut_flash_short">Flash Battery</string>
+    <string name="shortcut_flash_long">Flash Battery on Glyph LEDs</string>
+    <string name="shortcut_glow_short">Toggle Glow</string>
+    <string name="shortcut_glow_long">Toggle Glyph Charging Glow</string>
+    <string name="shortcut_health_short">Battery Health</string>
+    <string name="shortcut_health_long">View Battery Diagnostics</string>
+</resources>
