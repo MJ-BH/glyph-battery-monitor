@@ -9,15 +9,22 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.widget.RemoteViews
-import com.nothing.glyphbattery.GlyphBatteryApp
 import com.nothing.glyphbattery.R
-import com.nothing.glyphbattery.data.glyph.NothingGlyphConstants
+import com.nothing.glyphbattery.core.result.getOrNull
+import com.nothing.glyphbattery.data.source.NothingGlyphConstants
+import com.nothing.glyphbattery.domain.repository.BatteryRepository
+import com.nothing.glyphbattery.domain.repository.GlyphRepository
 import com.nothing.glyphbattery.presentation.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
-class NothingBatteryWidgetProvider : AppWidgetProvider() {
+class NothingBatteryWidgetProvider : AppWidgetProvider(), KoinComponent {
+
+    private val batteryRepository: BatteryRepository by inject()
+    private val glyphRepository: GlyphRepository by inject()
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (appWidgetId in appWidgetIds) {
@@ -29,12 +36,10 @@ class NothingBatteryWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
 
         if (intent.action == NothingGlyphConstants.ACTION_FLASH_BATTERY) {
-            val app = context.applicationContext as? GlyphBatteryApp
-            if (app != null) {
-                CoroutineScope(Dispatchers.Default).launch {
-                    val batteryInfo = app.batteryRepository.getBatteryInfoSnapshot()
-                    app.glyphRepository.triggerBatteryFlash(batteryInfo.level)
-                }
+            CoroutineScope(Dispatchers.Default).launch {
+                val batteryResult = batteryRepository.getBatteryInfo()
+                val level = batteryResult.getOrNull()?.level ?: 50
+                glyphRepository.triggerBatteryFlash(level)
             }
         }
 

@@ -1,5 +1,6 @@
 package com.nothing.glyphbattery.domain.usecase
 
+import com.nothing.glyphbattery.core.result.Result
 import com.nothing.glyphbattery.domain.model.BatteryInfo
 import com.nothing.glyphbattery.domain.model.GlyphAnimationMode
 import com.nothing.glyphbattery.domain.model.GlyphState
@@ -18,7 +19,7 @@ class TriggerGlyphBatteryFlashUseCaseTest {
 
     private class FakeBatteryRepository(private val level: Int) : BatteryRepository {
         override fun observeBatteryInfo(): Flow<BatteryInfo> = flowOf(BatteryInfo(level = level))
-        override fun getBatteryInfoSnapshot(): BatteryInfo = BatteryInfo(level = level)
+        override suspend fun getBatteryInfoSnapshot(): Result<BatteryInfo, Throwable> = Result.Success(BatteryInfo(level = level))
     }
 
     private class FakeGlyphRepository : GlyphRepository {

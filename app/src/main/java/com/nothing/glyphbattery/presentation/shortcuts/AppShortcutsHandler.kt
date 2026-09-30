@@ -7,7 +7,7 @@ import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import com.nothing.glyphbattery.R
-import com.nothing.glyphbattery.data.glyph.NothingGlyphConstants
+import com.nothing.glyphbattery.data.source.NothingGlyphConstants
 import com.nothing.glyphbattery.presentation.MainActivity
 
 object AppShortcutsHandler {

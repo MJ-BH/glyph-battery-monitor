@@ -12,36 +12,89 @@ When Nothing introduced the **Glyph Interface**, it fundamentally transformed th
 
 As developers, the **Nothing Glyph Developer Kit (GDK)** gives us direct programmatic control over the individual LED channels and progress strips of the device.
 
-In this article, I will walk you through how I built **Glyph Battery Monitor**—a modern Android application created with **Jetpack Compose (Material 3 + Nothing Dot-Matrix Design)** and **Clean Architecture**, supporting **Nothing Phone (2a)**, **Phone (2a) Plus**, **Phone (2)**, **Phone (1)**, and **future models (4a/3a)**.
+In this article, I will walk you through how I built **Glyph Battery Monitor**—a modern Android application engineered with **Clean Architecture**, **Koin Dependency Injection**, **Jetpack Compose (Material 3 + Nothing Dot-Matrix Design)**, and the official **Nothing Glyph Developer Kit (GDK)**, supporting **Nothing Phone (2a)**, **Phone (2a) Plus**, **Phone (2)**, **Phone (1)**, and **future models (4a/3a)**.
 
 We will explore:
-1. Connecting to the Nothing Glyph Developer Kit via IPC/AIDL and managing LED sessions.
-2. Building a reactive battery and charging data stream with Kotlin Coroutines `callbackFlow`.
-3. Crafting a high-performance **interactive on-screen Glyph Visualizer** in Jetpack Compose Canvas.
-4. Implementing a companion **Home Screen App Widget** and **Launcher App Shortcuts** for instant one-tap Glyph battery flashing.
+1. Structuring the codebase with the **Clean Architecture pattern** from [`MJ-BH/android-basic-clean-architecture`](https://github.com/MJ-BH/android-basic-clean-architecture).
+2. Implementing **Koin DI**, the functional **Result pattern (`Result<T, E>`)**, and sealed **UiState (`UiState<T>`)**.
+3. Connecting to the Nothing Glyph Developer Kit via IPC/AIDL and managing LED sessions.
+4. Building a reactive battery and charging data stream with Kotlin Coroutines `callbackFlow`.
+5. Crafting a high-performance **interactive on-screen Glyph Visualizer** in Jetpack Compose Canvas.
+6. Implementing a companion **Home Screen App Widget** and **Launcher App Shortcuts** for instant one-tap Glyph battery flashing.
 
 ---
 
 ## 🏗️ Architectural Foundations: Clean Architecture Blueprint
 
-To ensure scalability, testability, and clear separation of concerns, the app is organized into three distinct layers:
+To ensure scalability, testability, and clear separation of concerns, the app is organized strictly according to the reference repository [`MJ-BH/android-basic-clean-architecture`](https://github.com/MJ-BH/android-basic-clean-architecture):
 
 ```
 app/src/main/java/com/nothing/glyphbattery/
-├── domain/                      # 100% Pure Kotlin Business Logic
-│   ├── model/                  # BatteryInfo, NothingDeviceModel, GlyphState
-│   ├── repository/             # BatteryRepository, GlyphRepository interfaces
-│   └── usecase/                # ObserveBatteryInfoUseCase, ControlGlyphUseCase, TriggerGlyphBatteryFlashUseCase
-├── data/                        # Hardware Drivers & Data Sources
-│   ├── battery/                # BatteryDataSource (callbackFlow + BroadcastReceiver)
-│   ├── glyph/                  # GlyphManagerBridge (GDK dynamic binding + fallback)
-│   └── service/                # GlyphBatteryForegroundService (charging glow sync)
-└── presentation/                # Jetpack Compose UI
-    ├── ui/theme/               # Nothing Dot-Matrix Typography & AMOLED Dark Theme
-    ├── ui/components/          # DotMatrixBatteryLevel, GlyphDeviceVisualizer
-    ├── ui/dashboard/           # BatteryDashboardViewModel & Screen
-    ├── widget/                 # NothingBatteryWidgetProvider (App Widget)
-    └── shortcuts/              # AppShortcutsHandler (Dynamic Shortcuts)
+├── BaseApplication.kt                 # Koin DI initialization
+├── core/
+│   └── result/
+│       └── Result.kt                  # Sealed functional Result<T, E> with fold() and getOrNull()
+├── data/
+│   ├── dto/
+│   │   ├── BatteryInfoDto.kt          # Raw system battery metrics DTO
+│   │   └── GlyphStateDto.kt           # Hardware bridge state DTO
+│   ├── mapper/
+│   │   ├── BatteryMapper.kt           # DTO -> Pure Domain BatteryInfo mapper
+│   │   └── GlyphMapper.kt             # DTO -> Pure Domain GlyphState mapper
+│   ├── receiver/
+│   │   └── PowerConnectionReceiver.kt # BroadcastReceiver for power plug-in pulse (KoinComponent)
+│   ├── repository/
+│   │   ├── BatteryRepositoryImpl.kt   # Repository implementation with Dispatchers.IO
+│   │   └── GlyphRepositoryImpl.kt     # Glyph hardware repository implementation
+│   ├── service/
+│   │   └── GlyphBatteryForegroundService.kt # Foreground sync service (KoinComponent)
+│   └── source/
+│       ├── BatteryDataSource.kt       # System BatteryManager & BroadcastReceiver flow
+│       ├── GlyphManagerBridge.kt      # GDK Driver + reflection fallback + hardware detection
+│       └── NothingGlyphConstants.kt   # Model codes, channels, and intent actions
+├── di/
+│   └── AppModule.kt                   # Koin Dependency Injection definitions
+├── domain/
+│   ├── model/
+│   │   ├── BatteryHealth.kt           # Battery health enum
+│   │   ├── BatteryInfo.kt             # Pure immutable domain model
+│   │   ├── GlyphAnimationMode.kt      # Glyph animation modes
+│   │   ├── GlyphState.kt              # Glyph UI & hardware state
+│   │   ├── NothingDeviceModel.kt      # Nothing phone hardware models
+│   │   └── PluggedType.kt             # Power connection type enum
+│   ├── repository/
+│   │   ├── BatteryRepository.kt       # Domain repository contracts returning Result & Flow
+│   │   └── GlyphRepository.kt         # Glyph controller repository contract
+│   └── usecase/
+│       ├── ControlGlyphUseCase.kt     # Mode and model switching use case
+│       ├── GetBatteryInfoUseCase.kt   # One-shot battery query returning Result
+│       ├── GetNothingDeviceUseCase.kt # Device hardware query use case
+│       ├── ObserveBatteryInfoUseCase.kt # Reactive battery Flow use case
+│       └── TriggerGlyphBatteryFlashUseCase.kt # Momentary LED pulse use case
+├── presentation/
+│   ├── MainActivity.kt                # Jetpack Compose Activity using koinViewModel()
+│   ├── shortcuts/
+│   │   └── AppShortcutsHandler.kt     # Dynamic Launcher App Shortcuts
+│   └── widget/
+│       └── NothingBatteryWidgetProvider.kt # Dot-Matrix Home Screen Widget (KoinComponent)
+└── ui/
+    ├── battery/
+    │   ├── BatteryScreen.kt           # Feature Screen handling UiState.Loading/Success/Error/Empty
+    │   ├── BatteryUiEvent.kt          # MVI UI Events
+    │   ├── BatteryUiModel.kt          # UI Presentation state holder
+    │   ├── BatteryViewModel.kt        # ViewModel exposing StateFlow<UiState<BatteryUiModel>>
+    │   └── components/
+    │       ├── BatteryStatusMetricsGrid.kt # Diagnostics cards (temp, voltage, health)
+    │       ├── DotMatrixBatteryLevel.kt    # Large dot-matrix battery meter
+    │       ├── GlyphDeviceVisualizer.kt    # Animated hardware Canvas preview
+    │       └── NothingHeader.kt            # Signature Nothing top app bar & model picker
+    ├── state/
+    │   └── UiState.kt                 # Generic sealed UI State interface
+    └── theme/
+        ├── Color.kt                   # OLED Black, Dot-Matrix White, Nothing Red tokens
+        ├── Shapes.kt                  # Material 3 rounded curves
+        ├── Theme.kt                   # Nothing Dark OLED Compose Theme
+        └── Type.kt                    # Monospace typographic hierarchy
 ```
 
 ---
@@ -59,58 +112,23 @@ To control physical Glyph LEDs, we declare the Ketchum permission and developer 
 ```
 
 ### Initializing the Glyph Service & Managing Sessions
-The `GlyphManager` interacts with Nothing's system service:
+The `GlyphManagerBridge` interacts with Nothing's Ketchum system service with dynamic reflection safety and automated fallback simulation:
 
 ```kotlin
 class GlyphManagerBridge(private val context: Context) {
-    private var glyphManager: GlyphManager? = null
+    private var glyphManagerInstance: Any? = null
 
     fun init() {
-        glyphManager = GlyphManager.getInstance(context)
-        glyphManager?.init(object : GlyphManager.Callback {
-            override fun onServiceConnected(componentName: ComponentName) {
-                // Open a session before sending LED commands
-                glyphManager?.openSession()
-                detectDeviceHardware()
-            }
-
-            override fun onServiceDisconnected(componentName: ComponentName) {
-                glyphManager?.closeSession()
-            }
-        })
-    }
-}
-```
-
-### Multi-Device Hardware Detection
-Nothing phones feature distinct LED layouts:
-- **Phone (1)** (`is20111`): 5 zones (A, B, C, D, E), with `D1` functioning as the battery progress strip.
-- **Phone (2)** (`is22111`): 33 zones (A, B, C1-C16 coil, D1_1-D1_8 progress meter).
-- **Phone (2a) & (2a) Plus** (`is23111`, `is23113`): 3 camera ribbon LED strips.
-
-```kotlin
-fun displayBatteryProgress(progress: Int) {
-    val builder = glyphManager?.glyphFrameBuilder ?: return
-
-    when {
-        glyphManager?.is23111() == true || glyphManager?.is23113() == true -> {
-            // Phone (2a) ribbon strips
-            if (progress > 0) builder.buildChannelA()
-            if (progress > 33) builder.buildChannelB()
-            if (progress > 66) builder.buildChannelC()
-        }
-        glyphManager?.is22111() == true -> {
-            // Phone (2) circular coil & progress channel
-            builder.buildChannelC1()
-        }
-        else -> {
-            // Phone (1) D1 channel
-            builder.buildChannelD()
+        try {
+            val glyphManagerClass = Class.forName("com.nothing.ketchum.GlyphManager")
+            val callbackClass = Class.forName("com.nothing.ketchum.GlyphManager\$Callback")
+            val getInstance = glyphManagerClass.getMethod("getInstance", Context::class.java)
+            glyphManagerInstance = getInstance.invoke(null, context.applicationContext)
+            // Session initialization and hardware binding...
+        } catch (e: Exception) {
+            Log.d("GlyphManagerBridge", "Using on-screen virtual simulator")
         }
     }
-
-    val frame = builder.build()
-    glyphManager?.displayProgress(frame, progress)
 }
 ```
 
@@ -118,13 +136,13 @@ fun displayBatteryProgress(progress: Int) {
 
 ## 🔋 2. Reactive Battery Stream with Kotlin Coroutines
 
-Using `callbackFlow`, we transform Android's sticky `Intent.ACTION_BATTERY_CHANGED` broadcasts into a cold, lifecycle-safe Kotlin `Flow<BatteryInfo>`:
+Using `callbackFlow`, we transform Android's `Intent.ACTION_BATTERY_CHANGED` broadcasts into a cold, lifecycle-safe Kotlin `Flow<BatteryInfoDto>` which is mapped into immutable domain models:
 
 ```kotlin
-fun observeBattery(): Flow<BatteryInfo> = callbackFlow {
+fun observeBatteryDto(): Flow<BatteryInfoDto> = callbackFlow {
     val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            intent?.let { trySend(parseBatteryIntent(it)) }
+            intent?.let { trySend(extractBatteryDto(it)) }
         }
     }
 
@@ -134,9 +152,7 @@ fun observeBattery(): Flow<BatteryInfo> = callbackFlow {
         addAction(Intent.ACTION_POWER_DISCONNECTED)
     }
 
-    val stickyIntent = context.registerReceiver(receiver, filter)
-    stickyIntent?.let { trySend(parseBatteryIntent(it)) }
-
+    context.registerReceiver(receiver, filter)
     awaitClose { context.unregisterReceiver(receiver) }
 }
 ```
@@ -146,8 +162,8 @@ fun observeBattery(): Flow<BatteryInfo> = callbackFlow {
 ## 🎨 3. The UI: Jetpack Compose & Nothing Dot-Matrix Aesthetics
 
 The user interface captures Nothing's signature industrial design:
-- **Pure AMOLED Black (`#000000`)** background for battery efficiency.
-- **Dot-Matrix Typography** and segmented progress dots.
+- **Pure AMOLED Black (`#000000`)** background for OLED battery efficiency.
+- **Dot-Matrix Typography** and segmented progress indicators.
 - **Interactive Glyph Schematic Canvas**: Renders a live visual representation of the Nothing Phone backplate, lighting up the exact LED channels in sync with the physical hardware.
 
 ```kotlin

@@ -4,61 +4,49 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nothing.glyphbattery.GlyphBatteryApp
-import com.nothing.glyphbattery.data.glyph.NothingGlyphConstants
+import com.nothing.glyphbattery.data.source.NothingGlyphConstants
 import com.nothing.glyphbattery.presentation.shortcuts.AppShortcutsHandler
-import com.nothing.glyphbattery.presentation.ui.dashboard.BatteryDashboardEvent
-import com.nothing.glyphbattery.presentation.ui.dashboard.BatteryDashboardScreen
-import com.nothing.glyphbattery.presentation.ui.dashboard.BatteryDashboardViewModel
-import com.nothing.glyphbattery.presentation.ui.theme.GlyphBatteryTheme
-import com.nothing.glyphbattery.presentation.ui.theme.NothingBlack
+import com.nothing.glyphbattery.ui.battery.BatteryScreen
+import com.nothing.glyphbattery.ui.battery.BatteryUiEvent
+import com.nothing.glyphbattery.ui.battery.BatteryViewModel
+import com.nothing.glyphbattery.ui.state.UiState
+import com.nothing.glyphbattery.ui.theme.GlyphBatteryTheme
+import com.nothing.glyphbattery.ui.theme.NothingBlack
+import org.koin.androidx.compose.koinViewModel
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: BatteryDashboardViewModel by viewModels {
-        val app = application as GlyphBatteryApp
-        object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return BatteryDashboardViewModel(
-                    observeBatteryInfoUseCase = app.observeBatteryInfoUseCase,
-                    controlGlyphUseCase = app.controlGlyphUseCase,
-                    triggerGlyphBatteryFlashUseCase = app.triggerGlyphBatteryFlashUseCase,
-                    glyphRepository = app.glyphRepository
-                ) as T
-            }
-        }
-    }
+    private var activeViewModel: BatteryViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         AppShortcutsHandler.publishDynamicShortcuts(this)
 
-        handleShortcutIntent(intent)
-
         setContent {
+            val viewModel: BatteryViewModel = koinViewModel()
+            activeViewModel = viewModel
+
             GlyphBatteryTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = NothingBlack
                 ) {
                     val state by viewModel.uiState.collectAsStateWithLifecycle()
-                    BatteryDashboardScreen(
-                        state = state,
+                    BatteryScreen(
+                        uiState = state,
                         onEvent = viewModel::onEvent
                     )
                 }
             }
         }
+
+        handleShortcutIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -69,11 +57,11 @@ class MainActivity : ComponentActivity() {
     private fun handleShortcutIntent(intent: Intent?) {
         when (intent?.action) {
             NothingGlyphConstants.ACTION_FLASH_BATTERY -> {
-                viewModel.onEvent(BatteryDashboardEvent.FlashGlyphBattery)
+                activeViewModel?.onEvent(BatteryUiEvent.FlashGlyphBattery)
             }
             NothingGlyphConstants.ACTION_TOGGLE_CHARGING_GLOW -> {
-                val current = viewModel.uiState.value.glyphState.syncWithCharging
-                viewModel.onEvent(BatteryDashboardEvent.ToggleChargingGlow(!current))
+                val current = (activeViewModel?.uiState?.value as? UiState.Success)?.data?.glyphState?.syncWithCharging ?: false
+                activeViewModel?.onEvent(BatteryUiEvent.ToggleChargingGlow(!current))
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.nothing.glyphbattery.domain.usecase
 
+import com.nothing.glyphbattery.core.result.Result
 import com.nothing.glyphbattery.domain.model.BatteryHealth
 import com.nothing.glyphbattery.domain.model.BatteryInfo
 import com.nothing.glyphbattery.domain.model.PluggedType
@@ -18,7 +19,7 @@ class ObserveBatteryInfoUseCaseTest {
         private val mockInfo: BatteryInfo
     ) : BatteryRepository {
         override fun observeBatteryInfo(): Flow<BatteryInfo> = flowOf(mockInfo)
-        override fun getBatteryInfoSnapshot(): BatteryInfo = mockInfo
+        override suspend fun getBatteryInfoSnapshot(): Result<BatteryInfo, Throwable> = Result.Success(mockInfo)
     }
 
     @Test

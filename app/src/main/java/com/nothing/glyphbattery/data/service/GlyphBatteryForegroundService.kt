@@ -10,20 +10,26 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.nothing.glyphbattery.GlyphBatteryApp
 import com.nothing.glyphbattery.R
 import com.nothing.glyphbattery.domain.model.GlyphAnimationMode
+import com.nothing.glyphbattery.domain.repository.BatteryRepository
+import com.nothing.glyphbattery.domain.repository.GlyphRepository
 import com.nothing.glyphbattery.presentation.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 /**
  * Foreground Service that maintains Glyph charging feedback & status.
  */
-class GlyphBatteryForegroundService : Service() {
+class GlyphBatteryForegroundService : Service(), KoinComponent {
+
+    private val batteryRepo: BatteryRepository by inject()
+    private val glyphRepo: GlyphRepository by inject()
 
     private val serviceScope = CoroutineScope(Dispatchers.Default)
     private var syncJob: Job? = null
@@ -76,10 +82,6 @@ class GlyphBatteryForegroundService : Service() {
     private fun startObservingBattery() {
         syncJob?.cancel()
         syncJob = serviceScope.launch {
-            val app = application as? GlyphBatteryApp ?: return@launch
-            val batteryRepo = app.batteryRepository
-            val glyphRepo = app.glyphRepository
-
             batteryRepo.observeBatteryInfo().collectLatest { batteryInfo ->
                 val state = glyphRepo.glyphState.value
                 if (state.syncWithCharging && batteryInfo.isCharging) {
