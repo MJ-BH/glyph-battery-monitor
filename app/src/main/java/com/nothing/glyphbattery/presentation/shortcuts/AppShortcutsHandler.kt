@@ -7,60 +7,47 @@ import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import com.nothing.glyphbattery.R
+import com.nothing.glyphbattery.data.glyph.NothingGlyphConstants
 import com.nothing.glyphbattery.presentation.MainActivity
 
 object AppShortcutsHandler {
 
-    const val SHORTCUT_BIKE_BEACON = "shortcut_bike_beacon"
-    const val SHORTCUT_HEART_SYNC = "shortcut_heart_sync"
-    const val SHORTCUT_EMERGENCY_SOS = "shortcut_emergency_sos"
+    const val SHORTCUT_FLASH_BATTERY = "shortcut_flash_battery"
+    const val SHORTCUT_TOGGLE_GLOW = "shortcut_toggle_glow"
 
     fun publishDynamicShortcuts(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return
 
         val shortcutManager = context.getSystemService(ShortcutManager::class.java) ?: return
 
-        val bikeIntent = Intent(context, MainActivity::class.java).apply {
-            action = "ACTION_START_BIKE_BEACON"
+        val flashIntent = Intent(context, MainActivity::class.java).apply {
+            action = NothingGlyphConstants.ACTION_FLASH_BATTERY
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
 
-        val bikeShortcut = ShortcutInfo.Builder(context, SHORTCUT_BIKE_BEACON)
-            .setShortLabel("Bike Beacon")
-            .setLongLabel("Start Smart Bike Safety Beacon")
+        val flashShortcut = ShortcutInfo.Builder(context, SHORTCUT_FLASH_BATTERY)
+            .setShortLabel("Flash Glyph")
+            .setLongLabel("Flash Battery Level on Glyph")
             .setIcon(Icon.createWithResource(context, R.drawable.ic_shortcut_flash))
-            .setIntent(bikeIntent)
+            .setIntent(flashIntent)
             .setRank(1)
             .build()
 
-        val heartIntent = Intent(context, MainActivity::class.java).apply {
-            action = "ACTION_START_HEART_SYNC"
+        val toggleIntent = Intent(context, MainActivity::class.java).apply {
+            action = NothingGlyphConstants.ACTION_TOGGLE_CHARGING_GLOW
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
 
-        val heartShortcut = ShortcutInfo.Builder(context, SHORTCUT_HEART_SYNC)
-            .setShortLabel("CMF Heart Sync")
-            .setLongLabel("Mirror Wrist Heart Rate on Glyphs")
-            .setIcon(Icon.createWithResource(context, R.drawable.ic_shortcut_health))
-            .setIntent(heartIntent)
+        val toggleShortcut = ShortcutInfo.Builder(context, SHORTCUT_TOGGLE_GLOW)
+            .setShortLabel("Toggle Glow")
+            .setLongLabel("Toggle Glyph Charging Glow")
+            .setIcon(Icon.createWithResource(context, R.drawable.ic_shortcut_charging))
+            .setIntent(toggleIntent)
             .setRank(2)
             .build()
 
-        val sosIntent = Intent(context, MainActivity::class.java).apply {
-            action = "ACTION_TRIGGER_SOS"
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-
-        val sosShortcut = ShortcutInfo.Builder(context, SHORTCUT_EMERGENCY_SOS)
-            .setShortLabel("Morse SOS")
-            .setLongLabel("Transmit Emergency Optical SOS")
-            .setIcon(Icon.createWithResource(context, R.drawable.ic_shortcut_charging))
-            .setIntent(sosIntent)
-            .setRank(3)
-            .build()
-
         try {
-            shortcutManager.dynamicShortcuts = listOf(bikeShortcut, heartShortcut, sosShortcut)
+            shortcutManager.dynamicShortcuts = listOf(flashShortcut, toggleShortcut)
         } catch (_: Exception) {}
     }
 }

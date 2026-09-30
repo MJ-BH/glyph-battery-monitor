@@ -1,136 +1,212 @@
-# ⚡ Bridging the Glyph: Building an Intelligent Safety Beacon & Bio-Pulse Companion for Nothing Phone & CMF Watch Pro 2
+# ⚡ Mastering the Glyph Interface: Building a Clean Architecture Battery & Charging Monitor for Nothing Phones
 
 *By **MJ-BH** | Published for Android Developers, Nothing Community (#Co-Creation), and Tech Enthusiasts*
 
 ---
 
-![Cover Art](https://raw.githubusercontent.com/MJ-BH/glyph-beacon-cmf/main/art/banner.png)
+![Banner](https://raw.githubusercontent.com/MJ-BH/glyph-battery-monitor/main/art/banner.png)
 
-## 💡 The Inspiration: Unlocking the Untapped Power of the Glyph
+## 💡 Introduction: The Art of Hardware-Software Harmony
 
-When Carl Pei introduced the **Glyph Interface**, it redefined smartphone hardware by transforming the rear glass into an expressive, functional canvas of light. But while built-in features like the battery charging meter and timer progress bars are great, the true potential of the Nothing ecosystem lies in **hardware synergy**—specifically when you pair a Nothing Phone with wearable tech like the **CMF Watch Pro 2**.
+When Nothing introduced the **Glyph Interface**, it fundamentally transformed the back of the smartphone into a functional, ambient medium for notifications and visual progress indicators. 
 
-What if your phone wasn't just a screen in your pocket, but an **automotive-grade smart cycling brake light**, a **live bio-pulse visualizer reflecting your real-time heart rate**, and an **optical Morse code emergency transmitter**?
+As developers, the **Nothing Glyph Developer Kit (GDK)** gives us direct programmatic control over the individual LED channels and progress strips of the device.
 
-Today, I am open-sourcing **Glyph Beacon & CMF Companion**—a clean architecture Android application built with Jetpack Compose that connects Nothing Phone (2a, 2, 1, 3a) with the CMF Watch Pro 2 over Bluetooth Low Energy.
+In this article, I will walk you through how I built **Glyph Battery Monitor**—a modern Android application created with **Jetpack Compose (Material 3 + Nothing Dot-Matrix Design)** and **Clean Architecture**, supporting **Nothing Phone (2a)**, **Phone (2a) Plus**, **Phone (2)**, **Phone (1)**, and **future models (4a/3a)**.
 
----
-
-## 🌟 What the App Does
-
-```
- ┌───────────────────────────┐         Bluetooth LE         ┌───────────────────────────┐
- │     CMF Watch Pro 2       │ ───────────────────────────► │    Nothing Phone (2a)     │
- │  • Real-time Wrist BPM    │                              │  • 3 Ribbon LED Strips    │
- │  • Functional Crown / SOS │                              │  • Automotive Brake Light │
- │  • Workout Telemetry      │                              │  • Optical Morse SOS      │
- └───────────────────────────┘                              └───────────────────────────┘
-```
-
-### 1. 🚴 Smart Bike Safety Beacon with Real-Time Brake Light
-When you mount your Nothing Phone on your bike handle, backpack, or running armband:
-- **Speed-Adaptive Cadence Strobe**: The Glyph LEDs flash at a tempo that dynamically scales with your riding speed (faster strobe when sprinting or riding in traffic).
-- **Automotive-Grade Brake Light**: Using accelerometer and GPS sensor fusion, the app instantly detects deceleration (braking force) and ramps all rear Glyph LEDs to **100% solid bright glow**, warning motorists behind you before returning to cadence strobing.
-
-### 2. 🫀 CMF Watch Pro 2 Heart Bio-Pulse Mirroring
-- Streams your live wrist pulse from the CMF Watch Pro 2 over BLE GATT.
-- Converts your heart rate into a rhythmic systolic *'lub-dub'* pulse across the physical Glyph LEDs.
-- **Training Intensity Zones**: Dynamically visualizes whether you are in *Warm-Up*, *Aerobic / Fat Burn*, *Cardio*, or *Peak Stride* training zones.
-
-### 3. 🚨 Optical Morse Code SOS & Text Transmitter
-- One-tap distress beacon that encodes text into international **Morse Code `... --- ...` (SOS)**.
-- Flashes optical Morse sequences on the Glyph LEDs for high-visibility outdoor rescue, blackout signaling, or covert communications.
-
-### 4. 👏 Acoustic Clap & Watch "Find Phone" Supercharger
-- Uses low-latency audio thresholding to detect acoustic **double-claps** in a dark room.
-- Fires a 12-burst ultra-bright high-frequency strobe, instantly illuminating the room to reveal your phone without turning on the screen.
+We will explore:
+1. Connecting to the Nothing Glyph Developer Kit via IPC/AIDL and managing LED sessions.
+2. Building a reactive battery and charging data stream with Kotlin Coroutines `callbackFlow`.
+3. Crafting a high-performance **interactive on-screen Glyph Visualizer** in Jetpack Compose Canvas.
+4. Implementing a companion **Home Screen App Widget** and **Launcher App Shortcuts** for instant one-tap Glyph battery flashing.
 
 ---
 
-## 🏗️ Technical Architecture: Clean Architecture & Modern Android
+## 🏗️ Architectural Foundations: Clean Architecture Blueprint
 
-The project strictly follows **Clean Architecture** principles to separate hardware sensor drivers, domain rules, and presentation UI:
+To ensure scalability, testability, and clear separation of concerns, the app is organized into three distinct layers:
 
 ```
 app/src/main/java/com/nothing/glyphbattery/
-├── domain/                      # 100% Pure Kotlin Domain Layer
-│   ├── model/                  # BeaconSession, CmfWatchMetrics, MorseMessage, GlyphBeaconMode
-│   ├── repository/             # BeaconRepository, CmfWatchRepository
-│   └── usecase/                # Single-responsibility interactors
-├── data/                        # Data & Hardware Layer
-│   ├── ble/                    # CmfBleManager (BLE GATT Heart Rate Client)
-│   ├── motion/                 # SpeedAndBrakeDetector (Sensor Fusion)
-│   ├── audio/                  # ClapDetectorSource (AudioRecord PCM thresholding)
-│   ├── glyph/                  # GlyphManagerBridge (Nothing Ketchum SDK Bridge)
-│   └── service/                # GlyphBeaconForegroundService (Background execution)
+├── domain/                      # 100% Pure Kotlin Business Logic
+│   ├── model/                  # BatteryInfo, NothingDeviceModel, GlyphState
+│   ├── repository/             # BatteryRepository, GlyphRepository interfaces
+│   └── usecase/                # ObserveBatteryInfoUseCase, ControlGlyphUseCase, TriggerGlyphBatteryFlashUseCase
+├── data/                        # Hardware Drivers & Data Sources
+│   ├── battery/                # BatteryDataSource (callbackFlow + BroadcastReceiver)
+│   ├── glyph/                  # GlyphManagerBridge (GDK dynamic binding + fallback)
+│   └── service/                # GlyphBatteryForegroundService (charging glow sync)
 └── presentation/                # Jetpack Compose UI
-    ├── ui/theme/               # Nothing Dark Theme + CMF Orange (#FF5722)
-    ├── ui/components/          # CmfWatchDialVisualizer, GlyphBeaconVisualizer
-    └── ui/dashboard/           # BeaconCompanionViewModel (MVI StateFlow)
+    ├── ui/theme/               # Nothing Dot-Matrix Typography & AMOLED Dark Theme
+    ├── ui/components/          # DotMatrixBatteryLevel, GlyphDeviceVisualizer
+    ├── ui/dashboard/           # BatteryDashboardViewModel & Screen
+    ├── widget/                 # NothingBatteryWidgetProvider (App Widget)
+    └── shortcuts/              # AppShortcutsHandler (Dynamic Shortcuts)
 ```
 
 ---
 
-## 🔧 Deep Dive: Key Code Snippets
+## ⚡ 1. Interfacing with the Nothing Glyph Developer Kit
 
-### 1. Interfacing with Nothing Glyph Developer Kit (GDK)
-```kotlin
-val gm = GlyphManager.getInstance(context)
-gm.init(object : GlyphManager.Callback {
-    override fun onServiceConnected(componentName: ComponentName) {
-        gm.openSession()
-        // Hardware Detection: Supports Phone (2a), Phone (2), Phone (1)
-        val is2a = gm.is23111()
-    }
-    override fun onServiceDisconnected(componentName: ComponentName) {
-        gm.closeSession()
-    }
-})
+To control physical Glyph LEDs, we declare the Ketchum permission and developer key in `AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
+
+<application ...>
+    <meta-data android:name="NothingKey" android:value="test" />
+</application>
 ```
 
-### 2. Optical Morse Timing Sequence
+### Initializing the Glyph Service & Managing Sessions
+The `GlyphManager` interacts with Nothing's system service:
+
 ```kotlin
-fun toSignalSequence(text: String): List<MorseSignal> {
-    val signals = mutableListOf<MorseSignal>()
-    for (char in text.uppercase()) {
-        val morse = MORSE_MAP[char] ?: continue
-        for (symbol in morse) {
-            when (symbol) {
-                '.' -> signals.add(MorseSignal.LightOn(150L))
-                '-' -> signals.add(MorseSignal.LightOn(450L))
+class GlyphManagerBridge(private val context: Context) {
+    private var glyphManager: GlyphManager? = null
+
+    fun init() {
+        glyphManager = GlyphManager.getInstance(context)
+        glyphManager?.init(object : GlyphManager.Callback {
+            override fun onServiceConnected(componentName: ComponentName) {
+                // Open a session before sending LED commands
+                glyphManager?.openSession()
+                detectDeviceHardware()
             }
-            signals.add(MorseSignal.LightOff(150L)) // Element gap
-        }
-        signals.add(MorseSignal.LightOff(350L)) // Letter gap
+
+            override fun onServiceDisconnected(componentName: ComponentName) {
+                glyphManager?.closeSession()
+            }
+        })
     }
-    return signals
+}
+```
+
+### Multi-Device Hardware Detection
+Nothing phones feature distinct LED layouts:
+- **Phone (1)** (`is20111`): 5 zones (A, B, C, D, E), with `D1` functioning as the battery progress strip.
+- **Phone (2)** (`is22111`): 33 zones (A, B, C1-C16 coil, D1_1-D1_8 progress meter).
+- **Phone (2a) & (2a) Plus** (`is23111`, `is23113`): 3 camera ribbon LED strips.
+
+```kotlin
+fun displayBatteryProgress(progress: Int) {
+    val builder = glyphManager?.glyphFrameBuilder ?: return
+
+    when {
+        glyphManager?.is23111() == true || glyphManager?.is23113() == true -> {
+            // Phone (2a) ribbon strips
+            if (progress > 0) builder.buildChannelA()
+            if (progress > 33) builder.buildChannelB()
+            if (progress > 66) builder.buildChannelC()
+        }
+        glyphManager?.is22111() == true -> {
+            // Phone (2) circular coil & progress channel
+            builder.buildChannelC1()
+        }
+        else -> {
+            // Phone (1) D1 channel
+            builder.buildChannelD()
+        }
+    }
+
+    val frame = builder.build()
+    glyphManager?.displayProgress(frame, progress)
 }
 ```
 
 ---
 
-## 🎨 Design Language: Nothing Dot-Matrix meets CMF Industrial Design
+## 🔋 2. Reactive Battery Stream with Kotlin Coroutines
 
-The UI is built with **Jetpack Compose (Material 3)**, fusing Nothing OS's minimalist dot-matrix monochrome aesthetics with **CMF's signature vibrant orange (`#FF5722`)**.
+Using `callbackFlow`, we transform Android's sticky `Intent.ACTION_BATTERY_CHANGED` broadcasts into a cold, lifecycle-safe Kotlin `Flow<BatteryInfo>`:
 
-The screen features an interactive **CMF Watch Pro 2 circular dial Canvas** that visually mimics the aluminum case and functional crown, updating live with the BPM gauge alongside an interactive **Nothing Phone (2a) backplate schematic**.
+```kotlin
+fun observeBattery(): Flow<BatteryInfo> = callbackFlow {
+    val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            intent?.let { trySend(parseBatteryIntent(it)) }
+        }
+    }
+
+    val filter = IntentFilter().apply {
+        addAction(Intent.ACTION_BATTERY_CHANGED)
+        addAction(Intent.ACTION_POWER_CONNECTED)
+        addAction(Intent.ACTION_POWER_DISCONNECTED)
+    }
+
+    val stickyIntent = context.registerReceiver(receiver, filter)
+    stickyIntent?.let { trySend(parseBatteryIntent(it)) }
+
+    awaitClose { context.unregisterReceiver(receiver) }
+}
+```
+
+---
+
+## 🎨 3. The UI: Jetpack Compose & Nothing Dot-Matrix Aesthetics
+
+The user interface captures Nothing's signature industrial design:
+- **Pure AMOLED Black (`#000000`)** background for battery efficiency.
+- **Dot-Matrix Typography** and segmented progress dots.
+- **Interactive Glyph Schematic Canvas**: Renders a live visual representation of the Nothing Phone backplate, lighting up the exact LED channels in sync with the physical hardware.
+
+```kotlin
+@Composable
+fun DotMatrixBatteryLevel(level: Int, isCharging: Boolean) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(28.dp))
+            .background(NothingDarkSurface)
+            .border(1.dp, NothingCardBorder, RoundedCornerShape(28.dp))
+            .padding(24.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = if (isCharging) "CHARGING" else "DISCHARGING",
+                fontFamily = FontFamily.Monospace,
+                color = if (isCharging) NothingRed else NothingWhiteMuted,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "$level%",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 72.sp,
+                fontWeight = FontWeight.Bold,
+                color = NothingWhite
+            )
+            DottedProgressBar(progress = level / 100f)
+        }
+    }
+}
+```
+
+---
+
+## 🧩 4. App Widget & App Shortcuts
+
+- **Home Screen Widget** (`NothingBatteryWidgetProvider`): Displays live battery %, charging status, and provides a one-tap **"Flash Glyph"** button.
+- **App Shortcuts**: Long-press launcher shortcuts for:
+  - *Flash Battery on Glyph*
+  - *Toggle Charging Glow*
 
 ---
 
 ## 🚀 Open Source on GitHub
 
-The complete project is open-source and available on GitHub:
+The complete project is open source and available on GitHub:
 
-🔗 **GitHub Repository**: [https://github.com/MJ-BH/glyph-beacon-cmf](https://github.com/MJ-BH/glyph-beacon-cmf)
+🔗 **GitHub Repository**: [https://github.com/MJ-BH/glyph-battery-monitor](https://github.com/MJ-BH/glyph-battery-monitor)
 
-### Try it yourself:
-1. Clone the repository: `git clone https://github.com/MJ-BH/glyph-beacon-cmf.git`
-2. Enable Glyph Debugging on your Nothing Phone:
+### Testing on Your Device:
+1. Enable Glyph Debugging:
    ```bash
    adb shell settings put global nt_glyph_interface_debug_enable 1
    ```
-3. Run on your Nothing Phone (2a) and pair with your CMF Watch Pro 2!
+2. Build and install:
+   ```bash
+   ./gradlew installDebug
+   ```
 
 ---
 
-*What other creative hardware integrations would you love to see with the Nothing Glyph Interface? Let's discuss in the comments or on the Nothing Community forums with #Co-Creation!*
+*Feel free to star the repo, fork, and contribute! Tag your builds on the Nothing Community forums with #Co-Creation.*

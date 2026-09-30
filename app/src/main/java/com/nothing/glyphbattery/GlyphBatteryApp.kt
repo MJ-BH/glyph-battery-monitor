@@ -1,50 +1,51 @@
 package com.nothing.glyphbattery
 
 import android.app.Application
-import com.nothing.glyphbattery.data.beacon.BeaconRepositoryImpl
-import com.nothing.glyphbattery.data.ble.CmfWatchRepositoryImpl
-import com.nothing.glyphbattery.domain.repository.BeaconRepository
-import com.nothing.glyphbattery.domain.repository.CmfWatchRepository
-import com.nothing.glyphbattery.domain.usecase.ControlGlyphBeaconUseCase
-import com.nothing.glyphbattery.domain.usecase.ObserveBeaconMetricsUseCase
-import com.nothing.glyphbattery.domain.usecase.ObserveCmfHeartRateUseCase
-import com.nothing.glyphbattery.domain.usecase.TransmitMorseSosUseCase
-import com.nothing.glyphbattery.domain.usecase.TriggerFindPhoneStrobeUseCase
+import com.nothing.glyphbattery.data.battery.BatteryDataSource
+import com.nothing.glyphbattery.data.battery.BatteryRepositoryImpl
+import com.nothing.glyphbattery.data.glyph.GlyphRepositoryImpl
+import com.nothing.glyphbattery.domain.repository.BatteryRepository
+import com.nothing.glyphbattery.domain.repository.GlyphRepository
+import com.nothing.glyphbattery.domain.usecase.ControlGlyphUseCase
+import com.nothing.glyphbattery.domain.usecase.GetBatteryInfoUseCase
+import com.nothing.glyphbattery.domain.usecase.GetNothingDeviceUseCase
+import com.nothing.glyphbattery.domain.usecase.ObserveBatteryInfoUseCase
+import com.nothing.glyphbattery.domain.usecase.TriggerGlyphBatteryFlashUseCase
 
 class GlyphBatteryApp : Application() {
 
-    lateinit var cmfWatchRepository: CmfWatchRepository
+    lateinit var batteryRepository: BatteryRepository
         private set
 
-    lateinit var beaconRepository: BeaconRepository
+    lateinit var glyphRepository: GlyphRepository
         private set
 
-    lateinit var observeBeaconMetricsUseCase: ObserveBeaconMetricsUseCase
+    lateinit var observeBatteryInfoUseCase: ObserveBatteryInfoUseCase
         private set
 
-    lateinit var observeCmfHeartRateUseCase: ObserveCmfHeartRateUseCase
+    lateinit var getBatteryInfoUseCase: GetBatteryInfoUseCase
         private set
 
-    lateinit var controlGlyphBeaconUseCase: ControlGlyphBeaconUseCase
+    lateinit var controlGlyphUseCase: ControlGlyphUseCase
         private set
 
-    lateinit var transmitMorseSosUseCase: TransmitMorseSosUseCase
+    lateinit var triggerGlyphBatteryFlashUseCase: TriggerGlyphBatteryFlashUseCase
         private set
 
-    lateinit var triggerFindPhoneStrobeUseCase: TriggerFindPhoneStrobeUseCase
+    lateinit var getNothingDeviceUseCase: GetNothingDeviceUseCase
         private set
 
     override fun onCreate() {
         super.onCreate()
 
-        val cmfImpl = CmfWatchRepositoryImpl(this)
-        cmfWatchRepository = cmfImpl
-        beaconRepository = BeaconRepositoryImpl(this, cmfImpl)
+        val batteryDataSource = BatteryDataSource(this)
+        batteryRepository = BatteryRepositoryImpl(batteryDataSource)
+        glyphRepository = GlyphRepositoryImpl(this)
 
-        observeBeaconMetricsUseCase = ObserveBeaconMetricsUseCase(beaconRepository)
-        observeCmfHeartRateUseCase = ObserveCmfHeartRateUseCase(cmfWatchRepository)
-        controlGlyphBeaconUseCase = ControlGlyphBeaconUseCase(beaconRepository)
-        transmitMorseSosUseCase = TransmitMorseSosUseCase(beaconRepository)
-        triggerFindPhoneStrobeUseCase = TriggerFindPhoneStrobeUseCase(beaconRepository)
+        observeBatteryInfoUseCase = ObserveBatteryInfoUseCase(batteryRepository)
+        getBatteryInfoUseCase = GetBatteryInfoUseCase(batteryRepository)
+        controlGlyphUseCase = ControlGlyphUseCase(glyphRepository)
+        triggerGlyphBatteryFlashUseCase = TriggerGlyphBatteryFlashUseCase(batteryRepository, glyphRepository)
+        getNothingDeviceUseCase = GetNothingDeviceUseCase(glyphRepository)
     }
 }
