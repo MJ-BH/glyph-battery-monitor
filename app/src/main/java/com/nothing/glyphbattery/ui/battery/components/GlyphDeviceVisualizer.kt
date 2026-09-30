@@ -87,17 +87,17 @@ fun GlyphDeviceVisualizer(
             ) {
                 Column {
                     Text(
-                        text = "GLYPH INTERFACE",
+                        text = if (glyphState.isGenuineHardware) "PHYSICAL GLYPH HARDWARE" else "GLYPH INTERFACE",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = NothingRed,
+                        color = if (glyphState.isGenuineHardware) NothingRed else NothingWhiteMuted,
                         letterSpacing = 1.sp
                     )
                     Text(
-                        text = glyphState.deviceModel.displayName,
+                        text = if (glyphState.hardwareModelName.isNotBlank()) glyphState.hardwareModelName else glyphState.deviceModel.displayName,
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = NothingWhite
                     )

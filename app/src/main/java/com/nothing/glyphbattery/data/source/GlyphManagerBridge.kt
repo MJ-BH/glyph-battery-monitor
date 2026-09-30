@@ -1,6 +1,7 @@
 package com.nothing.glyphbattery.data.source
 
 import android.content.Context
+import android.hardware.camera2.CameraManager
 import android.os.Build
 import android.util.Log
 import com.nothing.glyphbattery.data.dto.GlyphStateDto
@@ -26,6 +27,11 @@ class GlyphManagerBridge(
     private var glyphManagerInstance: Any? = null
     private var isBound = false
     private var isSessionActive = false
+    private var cameraManager: CameraManager? = null
+    private var primaryCameraId: String? = null
+
+    private val isRealNothingPhone: Boolean = detectIsGenuineNothingHardware()
+    private val detectedDeviceModel: NothingDeviceModel = detectInitialModel()
 
     private val _glyphDtoState = MutableStateFlow(
         GlyphStateDto(
@@ -34,15 +40,36 @@ class GlyphManagerBridge(
             activeModeName = "PROGRESS_BAR",
             currentProgress = 0,
             activeChannels = emptyList(),
-            detectedModelCode = detectInitialModelCode(),
+            detectedModelCode = detectedDeviceModel.modelCode,
             syncWithCharging = true,
             flashOnPlugIn = true,
-            lastFlashedTimestamp = 0L
+            lastFlashedTimestamp = 0L,
+            isGenuineHardware = isRealNothingPhone,
+            hardwareModelName = "${Build.MANUFACTURER} ${Build.MODEL} (${detectedDeviceModel.displayName})"
         )
     )
     val glyphDtoState: StateFlow<GlyphStateDto> = _glyphDtoState.asStateFlow()
 
+    init {
+        try {
+            cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+            primaryCameraId = cameraManager?.cameraIdList?.firstOrNull()
+        } catch (_: Exception) {}
+    }
+
     fun init() {
+        if (!isRealNothingPhone) {
+            Log.i(tag, "Host device is not Nothing hardware (${Build.MANUFACTURER} ${Build.MODEL}). Simulator & Torch fallback active.")
+            _glyphDtoState.update {
+                it.copy(
+                    isConnected = true,
+                    isGenuineHardware = false,
+                    detectedModelCode = detectedDeviceModel.modelCode
+                )
+            }
+            return
+        }
+
         try {
             val glyphManagerClass = Class.forName("com.nothing.ketchum.GlyphManager")
             val callbackClass = Class.forName("com.nothing.ketchum.GlyphManager\$Callback")
@@ -57,16 +84,19 @@ class GlyphManagerBridge(
                     override fun invoke(proxy: Any?, method: Method, args: Array<out Any>?): Any? {
                         when (method.name) {
                             "onServiceConnected" -> {
-                                Log.d(tag, "GlyphService connected")
+                                Log.i(tag, "Nothing Glyph Ketchum Service Connected successfully!")
                                 isBound = true
-                                _glyphDtoState.update { it.copy(isConnected = true) }
+                                _glyphDtoState.update { it.copy(isConnected = true, isGenuineHardware = true) }
                                 detectHardwareModelFromGdk()
+                                openSession()
                             }
                             "onServiceDisconnected" -> {
-                                Log.d(tag, "GlyphService disconnected")
+                                Log.w(tag, "Nothing Glyph Ketchum Service Disconnected")
                                 isBound = false
                                 isSessionActive = false
-                                _glyphDtoState.update { it.copy(isConnected = false, isSessionOpen = false, activeChannels = emptyList()) }
+                                _glyphDtoState.update {
+                                    it.copy(isConnected = false, isSessionOpen = false, activeChannels = emptyList())
+                                }
                             }
                         }
                         return null
@@ -76,22 +106,38 @@ class GlyphManagerBridge(
 
             val initMethod = glyphManagerClass.getMethod("init", callbackClass)
             initMethod.invoke(glyphManagerInstance, callbackProxy)
+            Log.i(tag, "Initialized Nothing Ketchum GDK bridge")
         } catch (e: Exception) {
-            Log.w(tag, "Native GDK not found (Running in Simulator Mode): ${e.message}")
+            Log.w(tag, "Native GDK binding error: ${e.message}. Using high-precision simulator & hardware fallback.")
             _glyphDtoState.update { it.copy(isConnected = true) }
         }
     }
 
-    private fun detectInitialModelCode(): String {
+    private fun detectIsGenuineNothingHardware(): Boolean {
+        val mfg = Build.MANUFACTURER.uppercase()
+        val brand = Build.BRAND.uppercase()
         val model = Build.MODEL.uppercase()
         val device = Build.DEVICE.uppercase()
+
+        return mfg.contains("NOTHING") || brand.contains("NOTHING") ||
+                model.startsWith("A063") || model.startsWith("A065") ||
+                model.startsWith("A142") || model.startsWith("A145") ||
+                device.contains("PACMAN") || device.contains("PONG") ||
+                device.contains("SPACEWAR") || device.contains("TETRIS")
+    }
+
+    private fun detectInitialModel(): NothingDeviceModel {
+        val model = Build.MODEL.uppercase()
+        val device = Build.DEVICE.uppercase()
+
         return when {
-            model.contains("A142P") || device.contains("PACMANPRO") -> NothingGlyphConstants.MODEL_CODE_PHONE_2A_PLUS
-            model.contains("A142") || device.contains("PACMAN") -> NothingGlyphConstants.MODEL_CODE_PHONE_2A
-            model.contains("A065") || device.contains("PONG") -> NothingGlyphConstants.MODEL_CODE_PHONE_2
-            model.contains("A063") || device.contains("SPACELORD") -> NothingGlyphConstants.MODEL_CODE_PHONE_1
-            model.contains("3A") || model.contains("4A") -> NothingGlyphConstants.MODEL_CODE_PHONE_3A
-            else -> NothingGlyphConstants.MODEL_CODE_PHONE_2A
+            model.contains("A142P") || device.contains("PACMANPRO") -> NothingDeviceModel.PHONE_2A_PLUS
+            model.contains("A142") || device.contains("PACMAN") -> NothingDeviceModel.PHONE_2A
+            model.contains("A065") || device.contains("PONG") -> NothingDeviceModel.PHONE_2
+            model.contains("A063") || device.contains("SPACEWAR") -> NothingDeviceModel.PHONE_1
+            model.contains("A145") || device.contains("TETRIS") || model.contains("3A") || model.contains("4A") -> NothingDeviceModel.PHONE_3A_SERIES
+            isRealNothingPhone -> NothingDeviceModel.PHONE_2A
+            else -> NothingDeviceModel.PHONE_2A
         }
     }
 
@@ -104,14 +150,19 @@ class GlyphManagerBridge(
             val isPhone2 = runCatching { cls.getMethod("is22111").invoke(gm) as? Boolean }.getOrNull() == true
             val isPhone1 = runCatching { cls.getMethod("is20111").invoke(gm) as? Boolean }.getOrNull() == true
 
-            val code = when {
-                is2aPlus -> NothingGlyphConstants.MODEL_CODE_PHONE_2A_PLUS
-                is2a -> NothingGlyphConstants.MODEL_CODE_PHONE_2A
-                isPhone2 -> NothingGlyphConstants.MODEL_CODE_PHONE_2
-                isPhone1 -> NothingGlyphConstants.MODEL_CODE_PHONE_1
-                else -> detectInitialModelCode()
+            val detected = when {
+                is2aPlus -> NothingDeviceModel.PHONE_2A_PLUS
+                is2a -> NothingDeviceModel.PHONE_2A
+                isPhone2 -> NothingDeviceModel.PHONE_2
+                isPhone1 -> NothingDeviceModel.PHONE_1
+                else -> detectInitialModel()
             }
-            _glyphDtoState.update { it.copy(detectedModelCode = code) }
+            _glyphDtoState.update {
+                it.copy(
+                    detectedModelCode = detected.modelCode,
+                    hardwareModelName = "${Build.MANUFACTURER} ${Build.MODEL} (${detected.displayName})"
+                )
+            }
         } catch (_: Exception) {}
     }
 
@@ -124,6 +175,7 @@ class GlyphManagerBridge(
                 _glyphDtoState.update { it.copy(isSessionOpen = true) }
                 true
             } catch (e: Exception) {
+                Log.w(tag, "Failed to open Glyph session: ${e.message}")
                 false
             }
         }
@@ -159,6 +211,7 @@ class GlyphManagerBridge(
                     NothingGlyphConstants.MODEL_CODE_PHONE_1 -> runCatching { bCls.getMethod("buildChannelD").invoke(builder) }
                     NothingGlyphConstants.MODEL_CODE_PHONE_2 -> runCatching { bCls.getMethod("buildChannelC1").invoke(builder) }
                     else -> {
+                        // Phone (2a), Phone (2a)+, Phone (3a/4a)
                         if (clamped > 0) runCatching { bCls.getMethod("buildChannelA").invoke(builder) }
                         if (clamped > 33) runCatching { bCls.getMethod("buildChannelB").invoke(builder) }
                         if (clamped > 66) runCatching { bCls.getMethod("buildChannelC").invoke(builder) }
@@ -173,7 +226,9 @@ class GlyphManagerBridge(
                         method.invoke(gm, frame, clamped)
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(tag, "Error executing displayProgress on physical Glyph: ${e.message}")
+            }
         }
     }
 
@@ -182,9 +237,9 @@ class GlyphManagerBridge(
         return when (code) {
             NothingGlyphConstants.MODEL_CODE_PHONE_2A, NothingGlyphConstants.MODEL_CODE_PHONE_2A_PLUS, NothingGlyphConstants.MODEL_CODE_PHONE_3A -> {
                 val list = mutableListOf<String>()
-                if (progress > 10) list.add(NothingGlyphConstants.CHANNEL_A)
-                if (progress > 45) list.add(NothingGlyphConstants.CHANNEL_B)
-                if (progress > 80) list.add(NothingGlyphConstants.CHANNEL_C)
+                if (progress > 5) list.add(NothingGlyphConstants.CHANNEL_A)
+                if (progress > 35) list.add(NothingGlyphConstants.CHANNEL_B)
+                if (progress > 70) list.add(NothingGlyphConstants.CHANNEL_C)
                 list
             }
             NothingGlyphConstants.MODEL_CODE_PHONE_2 -> {
@@ -220,18 +275,76 @@ class GlyphManagerBridge(
     fun triggerQuickBatteryPulse(batteryLevel: Int) {
         scope.launch(Dispatchers.Default) {
             if (!isSessionActive) openSession()
-            _glyphDtoState.update { it.copy(activeChannels = listOf("ALL"), lastFlashedTimestamp = System.currentTimeMillis()) }
-            delay(150)
+
+            // 1. Initial Strobe Burst on all channels
+            _glyphDtoState.update {
+                it.copy(
+                    activeChannels = listOf("ALL", NothingGlyphConstants.CHANNEL_A, NothingGlyphConstants.CHANNEL_B, NothingGlyphConstants.CHANNEL_C),
+                    lastFlashedTimestamp = System.currentTimeMillis()
+                )
+            }
+
+            // Physical GDK full flash
+            val gm = glyphManagerInstance
+            if (gm != null && isSessionActive) {
+                try {
+                    val builder = gm.javaClass.getMethod("getGlyphFrameBuilder").invoke(gm)
+                    val bCls = builder.javaClass
+                    runCatching { bCls.getMethod("buildChannelA").invoke(builder) }
+                    runCatching { bCls.getMethod("buildChannelB").invoke(builder) }
+                    runCatching { bCls.getMethod("buildChannelC").invoke(builder) }
+                    runCatching { bCls.getMethod("buildChannelC1").invoke(builder) }
+                    runCatching { bCls.getMethod("buildChannelD").invoke(builder) }
+                    val frame = bCls.getMethod("build").invoke(builder)
+                    val displayProgressMethod = gm.javaClass.methods.firstOrNull { it.name == "displayProgress" }
+                    displayProgressMethod?.invoke(gm, frame, 100)
+                } catch (_: Exception) {}
+            } else if (!isRealNothingPhone) {
+                flashCameraTorchFallback()
+            }
+
+            delay(180)
+
+            // 2. Clear momentarily
             _glyphDtoState.update { it.copy(activeChannels = emptyList()) }
-            delay(100)
+            if (gm != null && isSessionActive) {
+                runCatching { gm.javaClass.getMethod("turnOff").invoke(gm) }
+            }
+            delay(120)
+
+            // 3. Display Exact Battery Percentage on Physical Glyph LEDs
             displayProgress(batteryLevel)
+
+            // 4. Hold the battery level indicator for 2.5 seconds
             delay(2500)
+
+            // 5. Clean up
             _glyphDtoState.update { it.copy(activeChannels = emptyList()) }
+            if (gm != null && isSessionActive) {
+                runCatching { gm.javaClass.getMethod("turnOff").invoke(gm) }
+            }
+        }
+    }
+
+    private fun flashCameraTorchFallback() {
+        val cm = cameraManager
+        val camId = primaryCameraId
+        if (cm != null && camId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                cm.setTorchMode(camId, true)
+                Thread.sleep(150)
+                cm.setTorchMode(camId, false)
+            } catch (_: Exception) {}
         }
     }
 
     fun setModel(model: NothingDeviceModel) {
-        _glyphDtoState.update { it.copy(detectedModelCode = model.modelCode) }
+        _glyphDtoState.update {
+            it.copy(
+                detectedModelCode = model.modelCode,
+                hardwareModelName = if (it.isGenuineHardware) "${Build.MANUFACTURER} ${Build.MODEL} (${model.displayName})" else "SIMULATOR (${model.displayName})"
+            )
+        }
     }
 
     fun setSyncCharging(enabled: Boolean) {
@@ -244,5 +357,9 @@ class GlyphManagerBridge(
 
     fun turnOff() {
         _glyphDtoState.update { it.copy(activeChannels = emptyList()) }
+        val gm = glyphManagerInstance
+        if (gm != null && isSessionActive) {
+            runCatching { gm.javaClass.getMethod("turnOff").invoke(gm) }
+        }
     }
 }

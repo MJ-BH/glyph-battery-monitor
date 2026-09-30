@@ -13,5 +13,7 @@ data class GlyphState(
     val deviceModel: NothingDeviceModel = NothingDeviceModel.PHONE_2A,
     val syncWithCharging: Boolean = true,
     val flashOnPlugIn: Boolean = true,
-    val lastFlashedTimestamp: Long = 0L
+    val lastFlashedTimestamp: Long = 0L,
+    val isGenuineHardware: Boolean = false,
+    val hardwareModelName: String = ""
 )
